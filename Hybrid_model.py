@@ -21,8 +21,7 @@ from torch.utils.data import DataLoader , Dataset
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
-import csv 
+
 
 import us8k_dataset as ds1
 import rnn_model as M1
