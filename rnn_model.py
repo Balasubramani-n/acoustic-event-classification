@@ -1,4 +1,5 @@
 #MODULE 1 : PROGRAM 2 MODEL : (CLASSICAL RNN BIDIRECTIONAL)
+#hi
 import torch
 from torch import nn
 
