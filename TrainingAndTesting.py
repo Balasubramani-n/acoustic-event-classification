@@ -2,7 +2,7 @@
 #PENDING : SPLIT THE DATA INTO TRAIN ANS SPLIT AND VALIDATE THE PROCESS 
 
 TRAIN = True
-name = "HybridModel"
+name = "RNN_GRU"
 
 import torch
 import torchaudio 
@@ -25,8 +25,8 @@ ACCURACY = []
 BATCH_SIZE = 32
 EPOCHS  = 200 
 LR = 0.01
-ANNOTATIONS_FILE = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\metadata\\set2.csv"
-AUDIO_DIR = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\audio"
+ANNOTATIONS_FILE = "../UrbanSound8K/metadata/set2.csv"
+AUDIO_DIR = "../UrbanSound8K/audio"
 SAMPLE_RATE = 22050*4 
 NUM_SAMPLES = 22050*4
 
@@ -38,16 +38,16 @@ NCLS = 10            #NUMBER OF CLASSES
 NH = 16
 
 
-PT_FILE = f"Trained\\{name}.pth"
-DATA_FILE = f"performance\\lossValues_{name}.csv"
+PT_FILE = f"Trained/{name}.pth"
+DATA_FILE = f"performance/lossValues_{name}.csv"
 
 def test_single_epoch(model , data_loader , loss_fun , device ) :
     model.eval()
     with torch.inference_mode() :
         for inp , tar in data_loader :
             inp , tar = inp.to(device) , tar.to(device)
-            #logits = model(inp.view(-1, 64, 171)) #dimentions for hybrid model 32, 1, 64, 171
-            logits = model(inp.view(32, 1, 64, 171))
+            logits = model(inp.view(-1, 64, 171)) #dimentions for hybrid model 32, 1, 64, 171
+            # logits = model(inp.view(32, 1, 64, 171))
             loss = loss_fun(logits , tar)
             acc = met.acc(logits , tar)
         tstLossList.append(loss.item())
@@ -61,8 +61,8 @@ def train_single_epoch(model , data_loader , loss_fun , optimiser , device , sch
         #calculate the loss
         #the input shape is (batch_size, sequence_length, input_size_1, input_size_2) = (32, 1, 64, 171).
         #print(inp.shape)
-        #logits = model(inp.view(-1, 64, 171))
-        logits = model(inp.view(32, 1, 64, 171))
+        logits = model(inp.view(-1, 64, 171))
+        # logits = model(inp.view(32, 1, 64, 171))
         loss = loss_fun(logits , tar)
         acc = met.acc(logits , tar)
 
@@ -117,11 +117,11 @@ if __name__  == "__main__" :
 
     print(tstDataLoader)
     
-    #model = M1.RNN_GRU(input_size = INP, hidden_size = HID , output_size = NCLS , num_layers = NL ).to(device)
+    model = M1.RNN_GRU(input_size = INP, hidden_size = HID , output_size = NCLS , num_layers = NL ).to(device)
 
     #model = M1.MultiLSTMBidirectionalModel(input_size = INP, hidden_size = HID, num_layers = NL , output_size = NCLS).to(device)
-    model = M1.HybridModel().to(device) 
-    model.load_state_dict(torch.load(PT_FILE))
+    # model = M1.HybridModel().to(device) 
+    # model.load_state_dict(torch.load(PT_FILE))
     
     print(model)
 
@@ -141,7 +141,7 @@ if __name__  == "__main__" :
         plt.xlabel('steps') 
         plt.ylabel('Loss')
         plt.title(f"Loss graph(class : {name})")
-        plt.savefig(f'performance//TrainVsTest_{name}.png')
+        plt.savefig(f'performance/TrainVsTest_{name}.png')
         plt.show()
         
         plt.plot(np.arange(len(trAcc)),np.array(trAcc))
@@ -150,7 +150,7 @@ if __name__  == "__main__" :
         plt.xlabel('steps') 
         plt.ylabel('accuracy')
         plt.title(f"Accuracy graph(class : {name})")
-        plt.savefig(f'performance//trAcc_Vs_testAcc_{name}.png')
+        plt.savefig(f'performance/trAcc_Vs_testAcc_{name}.png')
         plt.show()
     
         fieldnames = ['Training values' , 'Testing values' , 'Training acc' , 'Testing acc']
