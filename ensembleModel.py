@@ -13,7 +13,6 @@ TRAIN = True
 
 
 import torch
-import torchaudio 
 import torchaudio.transforms as T
 import torch.nn.functional as F
 from torch import nn
@@ -21,8 +20,7 @@ from torch.utils.data import DataLoader , Dataset
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
-import csv 
+
 
 import us8k_dataset as ds1
 import rnn_model as M1
@@ -33,7 +31,7 @@ ACCURACY = []
 BATCH_SIZE = 32
 EPOCHS  = 10
 LR = 0.001
-ANNOTATIONS_FILE = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\metadata\\set1.csv"
+ANNOTATIONS_FILE = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\metadata\\set6.csv"
 AUDIO_DIR = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\audio"
 SAMPLE_RATE = 22050*4 
 NUM_SAMPLES = 22050*4
@@ -70,7 +68,7 @@ def evaluate(models , data_loader , loss_fun ,  device , epochs ):
 
     for i in tqdm(range(epochs) , desc = "->"):
         test_single_epoch(models ,  data_loader  , loss_fun , device)
-    print("training finished")
+    print("Testing finished")
 
 # Call the averaging function during inference
 if __name__  == "__main__" :
