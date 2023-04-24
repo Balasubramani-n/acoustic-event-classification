@@ -2,6 +2,9 @@
 
 import torch
 from torch import nn
+import torchaudio 
+import torchaudio.transforms as T
+import torch.nn.functional as F
 import pyaudio as pa 
 import wave
 import us8k_dataset as d1 
@@ -17,6 +20,23 @@ ANNOTATIONS_FILE = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\Urb
 AUDIO_DIR = "C:\\Users\\nagav\\OneDrive\\Documents\\UrbanSound8K.tar\\UrbanSound8K\\audio"
 SAMPLE_RATE = 22050*4 
 NUM_SAMPLES = 22050*4
+
+INP = 171            #INPUTS 
+HID = BATCH_SIZE     #NUMBER OF HIDDEN LAYERS 
+NL  = 8              #NUMBER OF LAYERS 
+NU  = 1              #NUMBER OF UNITS 
+NCLS = 10            #NUMBER OF CLASSES
+NH = 16
+
+
+def predict(model , inp):
+    cm = "air_conditioner, car_horn, children_playing, dog_bark, drilling, engine_idling, gun_shot, jackhammer, siren, street_music".split(',')
+    model.eval()
+    with torch.inference_mode() :
+        p = model(inp)
+        pi = p[0].argmax(0)
+        p = cm[pi] #predicted 
+    return p 
 
 if __name__ == "__main__" :
 
@@ -44,7 +64,7 @@ if __name__ == "__main__" :
 
 
     model = m1.RNN_GRU(input_size = INP, hidden_size = HID, num_layers = NL , output_size = NCLS).to(device)
-    model.load_state_dict(torch.load("C:\\Users\\nagav\\OneDrive\\Desktop\\ML\\"+PT_FILE))
+    model.load_state_dict(torch.load("C:\\Users\\nagav\\OneDrive\\Desktop\\MLModuled\\Trained\\rnnV3.pth"))
 
     FRAMES_PER_BUFFER = 22050*4
     FORMAT = pa.paFloat32
@@ -73,7 +93,7 @@ if __name__ == "__main__" :
             #thread
             # mode
             vals = b"".join(frames)
-            _path = f"out{j}.wav"
+            _path = f"C:\\Users\\nagav\\OneDrive\\Desktop\\MLModuled\\temp\\out{j}.wav"
             obj = wave.open(_path,"wb")
             obj.setnchannels(CHANNELS)
             obj.setsampwidth(p.get_sample_size(FORMAT))
@@ -96,11 +116,10 @@ if __name__ == "__main__" :
             signal = usd.cutIfNecessary(signal)
             signal = usd.transformation(signal)
             inp = signal 
-            tar = torch.tensor([1])
             #inp , tar = usd[index][0] , usd[index][1] #[batch_size , num_channels , fr , time]
             #C:\Users\nagav\OneDrive\Desktop\ML\AF
         
-            p_ , e  = predict(model,inp,tar,class_mapping)
+            p_  = predict(model,inp)
             print(p_)
     except KeyboardInterrupt:
         stream.stop_stream()

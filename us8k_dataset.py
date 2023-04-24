@@ -55,8 +55,9 @@ class UrbanSoundDataset(Dataset) :
         signal = self.cutIfNecessary(signal)
         signal = self.rightPadIfNecessary(signal)
         #print(f"After {signal.shape}")
-                                                        #converting the signal to mel-spectrogram
+                                                        #converting the signal to MFCC spectrogram 
         signal = self.transformation(signal)
+        #signal = T.FrequencyMasking(freq_mask_param=80)
 
                                                         #Changing the signal to fixed length before making transformations
                                                         #we have different durations in length the problem is most deep learning architectures have data fixed in its shape
