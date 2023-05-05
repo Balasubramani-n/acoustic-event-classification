@@ -1,160 +1,85 @@
-#MODULE1 : TRAINING
-#PENDING : SPLIT THE DATA INTO TRAIN ANS SPLIT AND VALIDATE THE PROCESS 
-
-TRAIN = True
-name = "RNN_GRU"
-
-import torch
-import torchaudio 
-import torchaudio.transforms as T
-import torch.nn.functional as F
-from torch import nn
-from torch.utils.data import DataLoader , Dataset
-from tqdm import tqdm
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-import csv 
-
-import us8k_dataset as ds1
-import rnn_model as M1
+import coreConfig as cc
+import dataset as usd
 import MyMetrics as met
-
-trLossList , tstLossList  , trAcc , testAcc = [] , [] , [] , [] 
-ACCURACY = [] 
-BATCH_SIZE = 32
-EPOCHS  = 200 
-LR = 0.01
-ANNOTATIONS_FILE = "../UrbanSound8K/metadata/set2.csv"
-AUDIO_DIR = "../UrbanSound8K/audio"
-SAMPLE_RATE = 22050*4 
-NUM_SAMPLES = 22050*4
-
-INP = 171            #INPUTS 
-HID = BATCH_SIZE     #NUMBER OF HIDDEN LAYERS 
-NL  = 8              #NUMBER OF LAYERS 
-NU  = 1              #NUMBER OF UNITS 
-NCLS = 10            #NUMBER OF CLASSES
-NH = 16
-
-
-PT_FILE = f"Trained/{name}.pth"
-DATA_FILE = f"performance/lossValues_{name}.csv"
+from MyModels import * 
+exec(cc.stmts)
 
 def test_single_epoch(model , data_loader , loss_fun , device ) :
     model.eval()
     with torch.inference_mode() :
         for inp , tar in data_loader :
             inp , tar = inp.to(device) , tar.to(device)
-            logits = model(inp.view(-1, 64, 171)) #dimentions for hybrid model 32, 1, 64, 171
-            # logits = model(inp.view(32, 1, 64, 171))
+            logits = model(inp.view(-1, 64, 171)) 
+            
             loss = loss_fun(logits , tar)
             acc = met.acc(logits , tar)
-        tstLossList.append(loss.item())
-        testAcc.append(acc)
+            
         print(f"testing accuracy {acc}")
 
-def train_single_epoch(model , data_loader , loss_fun , optimiser , device , scheduler) :
+def train_single_epoch(model , data_loader , loss_fun , optimiser , device ) :
     model.train()
     for inp , tar in data_loader :
         inp , tar = inp.to(device) , tar.to(device)
-        #calculate the loss
-        #the input shape is (batch_size, sequence_length, input_size_1, input_size_2) = (32, 1, 64, 171).
-        #print(inp.shape)
+        
         logits = model(inp.view(-1, 64, 171))
-        # logits = model(inp.view(32, 1, 64, 171))
         loss = loss_fun(logits , tar)
         acc = met.acc(logits , tar)
 
-        
-        #propagate backwards
         optimiser.zero_grad()
         loss.backward()
         optimiser.step()
-        #scheduler.step(loss)
-        #ACCURACY.append(acc) 
-    trLossList.append(loss.item())
-    trAcc.append(acc)
+
     print(f"\ntraining accuracy {acc}")
 
-def evaluate(model , training_data_loader , testing_data_loader  , loss_fun , optimiser , device , epochs , scheduler):
+def fit(model , trLdr , tstLdr  , loss_fun , optimiser , device , epochs):
 
     for i in tqdm(range(epochs) , desc = "->"):
-        train_single_epoch(model , training_data_loader , loss_fun , optimiser , device ,scheduler)
-        test_single_epoch(model , training_data_loader , loss_fun , device)
+        train_single_epoch(model , trLdr , loss_fun , optimiser , device )
+        test_single_epoch(model , tstLdr , loss_fun , device)
+    
+
+if __name__ == "__main__":
+    #idea to perform kfold 
+    testFoldSet = [[j+1 for j in i] for i in it.permutations([i for i in range(cc.kfold)], r=cc.num_test_folds)]
+
+    Spec = cc.models[cc.currModel]["spec"]
+    ToDB = cc.models[cc.currModel]["toDB"]
+    params = cc.models[cc.currModel]["params"]
+    pt_file = cc.models[cc.currModel]["path"]
+    print(pt_file)
+    
+    print(testFoldSet)
+    loaders = [(DataLoader(usd.UrbanSoundDataset(
+                    spec = Spec,
+                    toDB = ToDB ,
+                    train = True ,
+                    test_fold = fold
+                    ),
+                batch_size=cc.batch_size, shuffle=True),
+                DataLoader(usd.UrbanSoundDataset(
+                    spec = Spec,
+                    toDB = ToDB ,
+                    train = False ,
+                    test_fold = fold
+                    ),
+                batch_size=cc.batch_size, shuffle=True))
+               for fold in testFoldSet]
+    model = globals()[cc.currModel](*params)
+
+    if os.path.exists(pt_file):
+        status = model.load_state_dict(torch.load(pt_file))
+        print(status)
+        
+    model = model.to(device)
+    loss_fun = eval(cc.models[cc.currModel]["loss_fun"])
+    optimizer = eval(cc.models[cc.currModel]["optimizer"])
+
+    print(loss_fun , optimizer)
+    
+
+    print("PERFORMING K-FOLDS")
+    for trLdr , tstLdr in loaders :
+        fit(model , trLdr , tstLdr  , loss_fun , optimizer , device , cc.epochs)
     print("training finished")
 
-
-if __name__  == "__main__" :
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Device using :{device}")
-                                                           
-    transform = T.MFCC(
-        sample_rate=SAMPLE_RATE,
-        n_mfcc=64,
-        melkwargs={"n_fft": 1024, "hop_length": 512, "n_mels": 64, "center": False},
-        )
-
     
-    usd = ds1.UrbanSoundDataset(
-        ANNOTATIONS_FILE ,
-        AUDIO_DIR ,
-        transform ,
-        SAMPLE_RATE ,
-        NUM_SAMPLES ,
-        device
-        )
-    #creating a custom dataloader and splitting the data 
-    train_size = int(0.8 * len(usd))
-    test_size = len(usd) - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(usd , [train_size, test_size])
-
-    print(len(train_dataset) , len(test_dataset))
-    
-    trDataLoader = DataLoader(train_dataset , batch_size = BATCH_SIZE,shuffle = True,drop_last=True)
-    tstDataLoader = DataLoader(test_dataset , batch_size = BATCH_SIZE,shuffle = True,drop_last=True)
-
-    print(tstDataLoader)
-    
-    model = M1.RNN_GRU(input_size = INP, hidden_size = HID , output_size = NCLS , num_layers = NL ).to(device)
-
-    #model = M1.MultiLSTMBidirectionalModel(input_size = INP, hidden_size = HID, num_layers = NL , output_size = NCLS).to(device)
-    # model = M1.HybridModel().to(device) 
-    # model.load_state_dict(torch.load(PT_FILE))
-    
-    print(model)
-
-
-    if(TRAIN) :
-        loss_fun = nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.ASGD(model.parameters() , lr = LR)#ASGD , SGD
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, threshold=0.001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
-        evaluate(model , trDataLoader , tstDataLoader , loss_fun , optimizer ,  device , EPOCHS , scheduler)
-
-        torch.save(model.state_dict() , PT_FILE)
-        print("trained RNN saved as "+PT_FILE)
-        
-        plt.plot(np.arange(len(trLossList)),np.array(trLossList))
-        plt.plot(np.arange(len(tstLossList)),np.array(tstLossList))
-        plt.legend({"Training loss :" : 14 , "Testing loss :":14})
-        plt.xlabel('steps') 
-        plt.ylabel('Loss')
-        plt.title(f"Loss graph(class : {name})")
-        plt.savefig(f'performance/TrainVsTest_{name}.png')
-        plt.show()
-        
-        plt.plot(np.arange(len(trAcc)),np.array(trAcc))
-        plt.plot(np.arange(len(testAcc)),np.array(testAcc))
-        plt.legend({"Training acc :" : 14 , "Testing acc :":14})
-        plt.xlabel('steps') 
-        plt.ylabel('accuracy')
-        plt.title(f"Accuracy graph(class : {name})")
-        plt.savefig(f'performance/trAcc_Vs_testAcc_{name}.png')
-        plt.show()
-    
-        fieldnames = ['Training values' , 'Testing values' , 'Training acc' , 'Testing acc']
-        with open(DATA_FILE ,"a+",newline = "") as f :
-            dict_writer = csv.writer(f)
-            for a, b, c , d in zip(trLossList , tstLossList  , trAcc , testAcc):
-                dict_writer.writerow([str(a) , str(b) , str(c) , str(d)])
