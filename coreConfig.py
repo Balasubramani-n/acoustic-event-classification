@@ -67,7 +67,7 @@ lfccTransform = T.LFCC(
     ).to(device)
    
 
-#______________________________MODELS________________________________
+#______________________________MODEL AND TRAINING________________________________
 #use class names specified in MyModels.py , this may affect other sections of the module
 currModel = "CNN_Net"
 epochs  = 50
