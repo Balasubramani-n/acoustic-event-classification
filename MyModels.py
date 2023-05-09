@@ -31,7 +31,7 @@ class RNN_GRU(nn.Module):
 
 class HybridModel(nn.Module):
 
-    def __init__(self,input_size, hidden_size, num_layers, output_size):
+    def __init__(self):
         super().__init__()
         self.num_layers = 5
         self.conv1 = nn.Sequential(

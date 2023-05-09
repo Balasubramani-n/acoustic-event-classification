@@ -1,7 +1,9 @@
-#DATASET
+#DATASET and DATA VISUALIZATION 
 import coreConfig as cc
 exec(cc.stmts)
-
+import librosa
+import librosa.display
+import warnings
 
 class UrbanSoundDataset(Dataset) :    
     mfcc_t = cc.mfccTransform
@@ -61,7 +63,6 @@ class UrbanSoundDataset(Dataset) :
             melDB = self.amp_to_DB(self.mel_t(signal))
             d.update({"melDB" : melDB})
 
-
         if d is dict() :
             raise ValueError("Not a valid spec value(s)")
 
@@ -105,33 +106,129 @@ class UrbanSoundDataset(Dataset) :
         return self.annotation.iloc[index , 6]
 
 
+    def data_visualization(self , index) :
+        initial_divice = self.device
+        self.device = "cpu"
+        
+        index = self.subSet[index]                                          
+    
+        audio_sample_path = self.get_audio_sample_path(index)  
+        label = self.get_audio_sample_label(index)             
+        waveform, sample_rate = torchaudio.load(audio_sample_path)
+        waveform = self.resampleIfNecessary(waveform, sample_rate)
+        waveform = self.mixDownIfNecessary(waveform)
+        waveform = self.cutIfNecessary(waveform)
+        waveform = self.rightPadIfNecessary(waveform)
+
+
+        try :
+            labelName = self.get_class_names()[label]
+            label = f"(label :{labelName} id :{index})"
+            
+            # Plot waveform
+            plt.figure(figsize=(8, 2))
+            plt.title('Waveform '+label)
+            plt.plot(waveform.t().numpy())
+            plt.xlabel('Time')
+            plt.ylabel('Amplitude')
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_Waveform_{labelName}.png")
+            # Compute MEL spectrogram
+            mel_spec = librosa.feature.melspectrogram(
+                y  = waveform.numpy()[0],
+                sr = cc.sample_rate,
+                n_fft = cc.n_fft ,
+                hop_length = cc.hop_length,
+                n_mels = cc.n_mels
+            )
+
+            # Plot MEL spectrogram
+            plt.figure(figsize=(8, 2))
+            plt.title('MEL Spectrogram '+label)
+            librosa.display.specshow(librosa.power_to_db(mel_spec, ref=np.max), y_axis='mel', x_axis='time', sr=cc.sample_rate)
+            plt.colorbar(format='%+2.0f dB')
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_MEL Spectrogram_{labelName}.png")
+
+            # Plot MEL spectrogram with dB scale
+            plt.figure(figsize=(8, 2))
+            plt.title('MEL Spectrogram with dB scale '+label)
+            librosa.display.specshow(mel_spec, y_axis='mel', x_axis='time', sr=cc.sample_rate)
+            plt.colorbar(format='%+2.0f dB')
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_MEL Spectrogram with dB scale_{labelName}.png")
+    
+            # Compute MFCCs
+            mfccs = librosa.feature.mfcc(
+            y=waveform.numpy()[0],
+            sr=cc.sample_rate,
+            n_mfcc=cc.n_mfcc,
+            n_fft=cc.n_fft,
+            hop_length=cc.hop_length
+            )
+
+            # Plot MFCCs
+            plt.figure(figsize=(8, 2))
+            plt.title('MFCCs '+label)
+            librosa.display.specshow(mfccs, x_axis='time', sr=cc.sample_rate)
+            plt.colorbar()
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_MFCCs_{labelName}.png")
+
+            # Plot MFCCs with dB scale
+            plt.figure(figsize=(8, 2))
+            plt.title('MFCCs with dB scale '+label)
+            librosa.display.specshow(librosa.power_to_db(mfccs, ref=np.max), x_axis='time', sr=cc.sample_rate)
+            plt.colorbar(format='%+2.0f dB')
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_MFCCs with dB scale_{labelName}.png")
+            # Compute LFCCs
+            lfccs = librosa.feature.mfcc(
+                y=waveform.numpy()[0],
+                sr=cc.sample_rate,
+                n_mfcc=cc.n_mfcc,
+                n_fft=cc.n_fft,
+                hop_length=cc.hop_length,
+                dct_type=2,
+                norm='ortho'
+            )
+
+            # Plot LFCCs
+            plt.figure(figsize=(8, 2))
+            plt.title('LFCCs '+label)
+            librosa.display.specshow(lfccs, x_axis='time', sr=cc.sample_rate)
+            plt.colorbar()
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_LFCCs_{labelName}.png")
+
+            # Plot LFCCs with dB scale
+            plt.figure(figsize=(8, 2))
+            plt.title('LFCCs with dB scale '+label)
+            librosa.display.specshow(librosa.power_to_db(lfccs, ref=np.max), x_axis='time', sr=cc.sample_rate)
+            plt.colorbar(format='%+2.0f dB')
+            plt.tight_layout()
+            plt.savefig(f"DP//id_{index}_LFCCs with dB scale_{labelName}.png")
+
+            # Show all plots
+            plt.show()
+        
+            
+        except Warning as e:
+            pass 
+        self.device = initial_divice
+        
+    def get_class_names(self):
+        return "air_conditioner, car_horn, children_playing, dog_bark, drilling, engine_idling, gun_shot, jackhammer, siren, street_music".split(", ")
+        
+
 
 if __name__ == "__main__":
-    #idea to perform kfold
 
     ds = UrbanSoundDataset(
-                    spec = "mel" ,
+                    spec = {"mfcc" , "mfccDB" } ,
                     train = True ,
-                    test_fold = [1]
+                    test_fold = [0]
                     )
 
-    print(ds[0])
-    testFoldSet = [[j+1 for j in i] for i in it.permutations([i for i in range(cc.kfold)], r=cc.num_test_folds)]
-
-    print(testFoldSet)
-    loaders = [(DataLoader(UrbanSoundDataset(
-                    spec = cc.models[cc.currModel]["spec"],
-                    train = True ,
-                    test_fold = t
-                    ),
-                batch_size=cc.batch_size, shuffle=True),
-                DataLoader(UrbanSoundDataset(
-                    spec = cc.models[cc.currModel]["spec"],
-                    train = False ,
-                    test_fold = t
-                    ),
-                batch_size=cc.batch_size, shuffle=True)) for t in testFoldSet]    
-
-
-    print(f"total loaders {len(loaders)*2}")  
-    print(device)
+   
+    ds.data_visualization(4)
